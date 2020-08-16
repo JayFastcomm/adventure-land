@@ -4,7 +4,7 @@ import {
   IPosition,
 } from "./definitions/adventureland";
 
-import { percentage } from "./constants/precentage";
+import { percentage } from "./constants/percentage";
 
 export class Follower {
   private parent: Window;

@@ -27,7 +27,7 @@ module.exports = {
     minimize: true,
   },
   resolve: {
-    extensions: [".tsx", ".ts", ".js"],
+    extensions: [".tsx", ".ts", ".js", ".scss"],
   },
   output: {
     filename: "[name].js",

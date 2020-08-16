@@ -42,6 +42,7 @@ declare global {
     } & {
       valentines?: boolean;
     };
+    $: any;
   }
 
   /**
