@@ -415,7 +415,20 @@ declare global {
   }): Entity;
 
   function get_socket(): any;
+  function use(name: string): void;
   function map_key(key: string, skill: string, code: string): void;
+  function buy(
+    name: string,
+    quanity
+  ): Promise<
+    | {
+        name: string;
+        num: number;
+        q: number;
+        cost: number;
+      }
+    | { reason: string }
+  >;
 
   let smart: IPosition & {
     /** If searching and false, we are still searching. If  */
@@ -578,6 +591,9 @@ declare global {
         wtype?: WeaponType;
       };
     };
+    levels: {
+      [level: string]: number;
+    };
   };
 }
 
@@ -669,6 +685,7 @@ export type CharacterEntity = Entity & {
   /** A bit of extra range that we can use to attack further monsters. It's variable. If you attack a monster using this extra range, it decreases for the next attack. */
   xrange: number;
   party: string;
+  xp: number;
   all(name, data): void;
 };
 

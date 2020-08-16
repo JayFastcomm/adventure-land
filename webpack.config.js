@@ -9,6 +9,7 @@ module.exports = {
     paladin: "./source/paladin.ts",
     rogue: "./source/rogue.ts",
     warrior: "./source/warrior.ts",
+    follower: "./source/follower.ts",
     // priest: "./source/priest.ts",
     // merchant: "./source/merchant.ts",
     // hardcore: "./source/hardcore.ts"
