@@ -1,0 +1,31 @@
+{
+  "42": [
+    "entities",
+    {
+      "players": [],
+      "monsters": [
+        {
+          "speed": 38,
+          "armor": 0,
+          "resistance": 0,
+          "id": "4909379",
+          "x": -593.1097811769613,
+          "y": 616.0521835640159,
+          "moving": true,
+          "going_x": -622.4454759019161,
+          "going_y": 627.0155129173716,
+          "abs": false,
+          "move_num": 32303415,
+          "angle": 159.5082897790014,
+          "type": "xscorpion",
+          "cid": 3,
+          "target": "RisingKyron",
+          "s": {}
+        }
+      ],
+      "type": "xy",
+      "in": "halloween",
+      "map": "halloween"
+    }
+  ]
+}
