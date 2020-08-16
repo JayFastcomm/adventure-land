@@ -1,135 +1,142 @@
-import { Entity, MonsterName, IPosition } from "./definitions/adventureland";
-import { mainTarget } from "./constants/main-target";
-import { targetPriority } from "./constants/target-priority";
-import { determineDistance } from "./constants/determine-distance";
-import { findTarget } from "./constants/find-target";
+import {
+  CharacterEntity,
+  Entity,
+  IPosition,
+} from "./definitions/adventureland";
+
+import { percentage } from "./constants/precentage";
 
 export class Paladin {
+  private parentCharacter: CharacterEntity = parent.character;
+  private hpPotion: string = "hpot0";
+  private mpPotion: string = "mpot0";
+  private potsMinimum: number = 50;
+  private potsToBuy: number = 1000;
+  private leader: Entity;
+  private target: Entity;
+  private currentTarget: Entity;
+  private lastHpStamp: Date;
+  private lastMpStamp: Date;
+  private lastMoveStamp: Date;
+  private isParty: boolean;
+
   constructor() {
-    const socket = get_socket();
-    socket.on("*", (data) => {
-      game_log(`data: ${data}`);
-    });
+    const socket: any = get_socket();
+    this.socketListener(socket);
   }
-  ticks: number = 1;
-  mainTarget = mainTarget;
-  minTargetDistance = 100;
-  targetPriority = targetPriority;
-  attackMode = true;
-  filterCriteria: string = "mtype";
-  currentTarget: Entity;
-  isAttacking: boolean;
-  targetMaxRange: number = 10;
-  targets: MonsterName[] = ["goo"];
-  attacking: boolean;
-  testSocket;
 
   mainLoop() {
-    parent.socket.on("drop", (data) => {
-      game_log(data);
-    });
-    character.on("incoming", (data) => {
-      game_log("incoming-damage");
-      this.attack(data.actor);
-    });
-    game.on("*", (data) => {
-      game_log(data);
-    });
-
+    game_log("main Loop init");
     setInterval(() => {
-      if (!this.attackMode || parent.character.rip) {
-        return;
-      }
-
-      this.detectMainTarget();
-
-      use_hp_or_mp();
-      // loot();
-    }, Math.max(5000, parent.character.ping));
+      game_log(`[tick: ${new Date().getTime()}]`);
+      this.isParty = !!this.parentCharacter.party;
+      this.restoration();
+      this.purchasePotions();
+      this.getTargeting();
+      this.move();
+      this.attack();
+    }, Math.max(5000, this.parentCharacter.ping));
   }
 
-  detectMainTarget() {
-    if (!this.currentTarget) {
-      let targetList: Entity[] = [];
-      try {
-        const filtered = Object.keys(parent.entities)
-          .filter(
-            (key) =>
-              parent.entities[key].visible &&
-              this.targets.includes(parent.entities[key].mtype) &&
-              parent.entities[key].attack < 20 &&
-              determineDistance(
-                parent.character.real_x,
-                parent.character.real_y,
-                parent.entities[key].real_x,
-                parent.entities[key].real_y
-              ) < this.targetMaxRange
-          )
-          .map((key, index) => {
-            // targetList.push([
-            //   parent.entities[key].id,
-            //   this.mathRound(
-            //     determineDistance(
-            //       parent.character.real_x,
-            //       parent.character.real_y,
-            //       parent.entities[key].real_x,
-            //       parent.entities[key].real_y
-            //     )
-            //   ),
-            // ]);
-            // game_log(`targetList: ${targetList}`);
-            targetList[index] = parent.entities[key];
-          });
+  purchasePotions(): void {
+    game_log(`in purchase pots: ${this.parentCharacter.items[0].name}`);
+    // if (
+    //   this.parentCharacter.items.length &&
+    //   this.parentCharacter.gold &&
+    //   this.parentCharacter.gold > 10000
+    // ) {
+    //   game_log(`looking for hpPotion in inventory`);
+    //   const hpPotions = this.parentCharacter.items.find(
+    //     (item) => item.name == this.hpPotion
+    //   );
+    //   game_log(`looking for mpPotion in inventory`);
+    //   const mpPotions = this.parentCharacter.items.find(
+    //     (item) => item.name == this.mpPotion
+    //   );
+    //   if (hpPotions && hpPotions.q < this.potsMinimum) {
+    //     buy(this.hpPotion, this.potsToBuy);
+    //     set_message("Buying hp pots.");
+    //   }
+    //   if (mpPotions && mpPotions.q < this.potsMinimum) {
+    //     buy(this.mpPotion, this.potsToBuy);
+    //     set_message("Buying mp pots.");
+    //   }
+    // } else {
+    //   set_message("Not enough cash");
+    // }
+  }
 
-        // show_json(targetList);
-
-        // show_json(
-        //   `sorted TargetList: ${targetList.sort((a, b) =>
-        //     a[1] > b[1] ? 1 : -1
-        //   )}`
-        // );
-      } catch (error) {
-        game_log(`main target error: ${error}`);
-      }
+  getTargeting(): void {
+    game_log("get Targeting");
+    if (this.isParty) {
+      game_log(`is party looking for leader: ${this.parentCharacter.party}`);
+      // this.leader = get_player(this.parentCharacter.party);
+      // this.currentTarget = get_target_of(this.leader);
+    } else {
+      game_log("not party");
+      // this.currentTarget = get_nearest_monster({});
     }
   }
 
-  attack(target: Entity): void {
-    this.currentTarget = target ? findTarget(target.id) : this.currentTarget;
-    game_log(`attacking: ${this.currentTarget.id}`);
+  attack(): void {
+    if (this.currentTarget) {
+      attack(this.currentTarget);
+    }
+  }
+
+  move() {
     if (
-      !is_in_range(this.currentTarget, "attack") &&
-      !is_moving(parent.character)
+      !this.lastMoveStamp ||
+      new Date().getTime() - this.lastMoveStamp.getTime() > 250
     ) {
-      this.moveLoop();
-    } else if (can_attack(this.currentTarget)) {
-      set_message("Attacking");
-      attack(this.currentTarget).then(
-        (data) => {
-          game_log("success attack");
-          reduce_cooldown("attack", Math.max(250, parent.character.ping));
-        },
-        (error) => {
-          game_log(`error: ${error.reason}`);
-        }
-      );
+      if (!this.parentCharacter.moving && this.leader) {
+        xmove(this.leader.real_x, this.leader.real_y);
+        this.lastMoveStamp = new Date();
+      }
     }
   }
 
-  moveLoop() {
-    if (can_move_to(this.currentTarget.real_x, this.currentTarget.real_y))
-      game_log(`moving to target`);
-    xmove(
-      parent.character.real_x +
-        (this.currentTarget.real_x - parent.character.real_x),
-      parent.character.real_y +
-        (this.currentTarget.real_y - parent.character.real_y)
-    );
+  socketListener(socket): void {
+    if (!socket.disconnected) {
+      socket.on("drop", (data: { id: string; chest: string } & IPosition) => {
+        if (distance(this.parentCharacter, data) > 800) {
+          return;
+        } else {
+          parent.socket.emit("open_chest", { id: data.id });
+        }
+      });
+
+      socket.on("incoming", (data) => {
+        const aggressor = this.parentCharacter[data.actor];
+        if (aggressor.eta <= 50 && can_attack(aggressor)) {
+          attack(aggressor);
+        }
+      });
+    } else {
+      set_message("socket disconnected");
+    }
   }
 
-  mathRound(number: number): number {
-    return Math.round((number + Number.EPSILON) * 100) / 100;
+  restoration() {
+    if (percentage(this.parentCharacter.hp, this.parentCharacter.max_hp) < 50) {
+      if (
+        !this.lastHpStamp ||
+        new Date().getTime() - this.lastHpStamp.getTime() > 5000
+      )
+        use("use_hp");
+      set_message("Drinking HP");
+    }
+    if (percentage(this.parentCharacter.mp, this.parentCharacter.max_mp) < 50) {
+      if (
+        !this.lastMpStamp ||
+        new Date().getTime() - this.lastMpStamp.getTime() > 5000
+      ) {
+        use("use_mp");
+        set_message("Drinking MP");
+      }
+    }
   }
 }
+
 const paladin = new Paladin();
 paladin.mainLoop();

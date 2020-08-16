@@ -31,7 +31,7 @@ export class Follower {
     setInterval(() => {
       this.restoration();
       this.purchasePotions();
-      this.getTargeting();
+      //   this.getTargeting();
       this.attackLoop();
     }, Math.max(250, this.parentCharacter.ping));
   }
