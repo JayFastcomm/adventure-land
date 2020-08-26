@@ -5,7 +5,6 @@ import {
 } from "./definitions/adventureland";
 
 import { percentage } from "./constants/percentage";
-import { customStyles } from "./constants/custom-styles";
 
 export class Paladin {
   private parentCharacter: CharacterEntity = parent.character;
@@ -20,6 +19,9 @@ export class Paladin {
   private lastMpStamp: Date;
   private lastMoveStamp: Date;
   private isParty: boolean;
+  debugMode: boolean;
+  mainInterval: any;
+  manaCooldownTimeout: boolean;
 
   constructor() {
     const socket: any = get_socket();
@@ -38,8 +40,21 @@ export class Paladin {
   }
 
   mainLoop() {
-    setInterval(() => {
-      game_log(`ping:${this.parentCharacter.ping}`);
+    this.mainInterval = setInterval(() => {
+      if (this.parentCharacter.rip) {
+        this.logger(
+          `You DIED!, clearing mailLoop interval: ${new Date()}`,
+          "high"
+        );
+        clearInterval(this.mainInterval);
+      }
+
+      if (
+        percentage(this.parentCharacter.mp, this.parentCharacter.max_mp) <= 50
+      ) {
+        this.manaCooldown();
+      }
+      loot();
       this.isParty = !!this.parentCharacter.party;
 
       this.restoration();
@@ -51,72 +66,83 @@ export class Paladin {
   }
 
   purchasePotions(): void {
-    game_log(`in purchase pots`);
     try {
       if (
         this.parentCharacter.items.length &&
         this.parentCharacter.gold &&
         this.parentCharacter.gold > 10000
       ) {
-        game_log(`looking for hpPotion in inventory`);
+        this.logger(`looking for hpPotion in inventory`);
         const hpPotions = this.parentCharacter.items.find(
           (item) => item.name == this.hpPotion
         );
-        game_log(`looking for mpPotion in inventory`);
+        this.logger(`looking for mpPotion in inventory`);
         const mpPotions = this.parentCharacter.items.find(
           (item) => item.name == this.mpPotion
         );
         if (hpPotions && hpPotions.q < this.potsMinimum) {
           buy(this.hpPotion, this.potsToBuy);
-          game_log("buying hp potions");
+          this.logger("buying hp potions");
         } else {
-          game_log("enough hp potion");
+          this.logger("enough hp potion");
         }
         if (mpPotions && mpPotions.q < this.potsMinimum) {
           buy(this.mpPotion, this.potsToBuy);
-          game_log("buying mp potions");
+          this.logger("buying mp potions");
         } else {
-          game_log("enough mp potions");
+          this.logger("enough mp potions");
         }
       } else {
-        game_log("Not enough cash");
+        this.logger("Not enough cash");
       }
     } catch {
-      game_log("purchase pots fucked out");
+      this.logger("purchase pots fucked out");
     }
   }
 
   getTargeting(): void {
-    game_log("get Targeting");
     try {
       if (this.isParty) {
-        game_log(`is party looking for leader: ${this.parentCharacter.party}`);
+        this.logger(
+          `is party looking for leader: ${this.parentCharacter.party}`
+        );
         this.leader = get_player(this.parentCharacter.party);
         if (this.parentCharacter.party == this.parentCharacter.name) {
-          game_log("is leader - targetting");
+          this.logger("is leader - targetting");
           this.currentTarget = get_nearest_monster({});
         } else {
-          game_log(`not leader, attacking leader target`);
+          this.logger(`not leader, attacking leader target`);
           this.currentTarget = get_target_of(this.leader);
         }
       } else {
-        game_log("not party");
+        this.logger("not party");
         this.currentTarget = get_nearest_monster({});
       }
     } catch {
-      game_log("get targetting fucked out");
+      this.logger("get targetting fucked out");
     }
   }
 
   attack(): void {
     if (this.currentTarget) {
-      if (!is_on_cooldown("attack")) {
+      if (is_in_range(this.currentTarget, "attack")) {
         set_message("attacking");
-        attack(this.currentTarget).then((data) => {
-          game_log(`ping after attack callback: ${this.parentCharacter.ping}`);
-          reduce_cooldown("attack", this.parentCharacter.ping * 0.95);
-        });
+        if (!is_on_cooldown("attack")) {
+          attack(this.currentTarget).then((data) => {
+            this.logger(
+              `ping after attack callback: ${this.parentCharacter.ping}`
+            );
+            reduce_cooldown("attack", this.parentCharacter.ping * 0.95);
+          });
+        }
       }
+      // else {
+      //   if (!this.manaCooldownTimeout) {
+      //     if (!is_on_cooldown("mshield")) {
+      //       use_skill("mshield");
+      //     }
+      //   }
+      // }
     }
   }
 
@@ -151,20 +177,20 @@ export class Paladin {
   socketListener(socket): void {
     if (socket) {
       socket.on("drop", (data: { id: string; chest: string } & IPosition) => {
-        game_log("socket drop");
-        if (distance(this.parentCharacter, data) > 800) {
-          return;
-        } else {
-          parent.socket.emit("open_chest", { id: data.id });
-        }
+        this.logger("socket drop");
+        // if (distance(this.parentCharacter, data) > 800) {
+        //   return;
+        // } else {
+        //   parent.socket.emit("open_chest", { id: data.id });
+        // }
       });
 
       socket.on("incoming", (data) => {
-        game_log("incoming!");
-        const aggressor = this.parentCharacter[data.actor];
-        if (aggressor.eta <= 50 && can_attack(aggressor)) {
-          attack(aggressor);
-        }
+        this.logger("incoming!");
+        // const aggressor = this.parentCharacter[data.actor];
+        // if (aggressor.eta <= 50 && can_attack(aggressor)) {
+        //   attack(aggressor);
+        // }
       });
     } else {
       set_message("socket disconnected");
@@ -172,11 +198,23 @@ export class Paladin {
   }
 
   restoration() {
+    if (!this.manaCooldownTimeout) {
+      can_use("regen_hp")
+        ? is_on_cooldown("regen_hp")
+          ? null
+          : use_skill("regen_hp")
+        : null;
+      can_use("regen_mp")
+        ? is_on_cooldown("regen_mp")
+          ? null
+          : use_skill("regen_mp")
+        : null;
+    }
     try {
       if (
         percentage(this.parentCharacter.hp, this.parentCharacter.max_hp) < 85
       ) {
-        game_log(
+        this.logger(
           `hp % ${percentage(
             this.parentCharacter.hp,
             this.parentCharacter.max_hp
@@ -186,14 +224,16 @@ export class Paladin {
           !this.lastHpStamp ||
           new Date().getTime() - this.lastHpStamp.getTime() > 5000
         ) {
-          set_message("restoringHP");
-          use("use_hp");
+          if (!is_on_cooldown("use_hp")) {
+            set_message("restoringHP");
+            use("use_hp");
+          }
         }
       }
       if (
         percentage(this.parentCharacter.mp, this.parentCharacter.max_mp) < 85
       ) {
-        game_log(
+        this.logger(
           `mp % ${percentage(
             this.parentCharacter.mp,
             this.parentCharacter.max_mp
@@ -203,12 +243,30 @@ export class Paladin {
           !this.lastMpStamp ||
           new Date().getTime() - this.lastMpStamp.getTime() > 5000
         ) {
-          set_message("restoringMP");
-          use("use_mp");
+          if (!is_on_cooldown("use_mp")) {
+            set_message("restoringMP");
+            use("use_mp");
+          }
         }
       }
     } catch {
-      game_log("something here fucked up");
+      this.logger("something here fucked up");
+    }
+  }
+
+  manaCooldown() {
+    this.manaCooldownTimeout = true;
+    setTimeout(() => {
+      this.manaCooldownTimeout = false;
+    }, 10000);
+  }
+
+  logger(data: any, priority?: string): void {
+    if (priority == "high") {
+      return game_log(data);
+    }
+    if (this.debugMode) {
+      game_log(data);
     }
   }
 }

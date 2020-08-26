@@ -5,11 +5,11 @@ const Path = require("path");
 module.exports = {
   plugins: [new Dotenv()],
   entry: {
-    mage: "./source/mage.ts",
+    // mage: "./source/mage.ts",
     paladin: "./source/paladin.ts",
     rogue: "./source/rogue.ts",
     warrior: "./source/warrior.ts",
-    follower: "./source/follower.ts",
+    // follower: "./source/follower.ts",
     // priest: "./source/priest.ts",
     // merchant: "./source/merchant.ts",
     // hardcore: "./source/hardcore.ts"
